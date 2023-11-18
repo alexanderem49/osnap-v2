@@ -98,7 +98,8 @@ contract ActionRouter {
                     liveness,
                     data,
                     bondToken,
-                    bondTokenAmount
+                    bondTokenAmount,
+                    executor
                 )
             ),
             address(this),
@@ -119,7 +120,8 @@ contract ActionRouter {
         uint256 liveness,
         bytes memory data,
         address bondToken,
-        uint256 bondTokenAmount
+        uint256 bondTokenAmount,
+        address executor
     ) public view returns (string memory) {
         uint256 optionsLength = options.length;
 
@@ -161,7 +163,7 @@ contract ActionRouter {
         if (data.length > 0) {
             claim = abi.encodePacked(
                 claim,
-                "The JSON object in the proposal body contains 'data' field which exacly matches following value: '",
+                "The JSON object in the proposal body contains 'data' field which exacly matches the following value: '",
                 Bytes.bytesToString(data),
                 "'."
             );
@@ -175,22 +177,24 @@ contract ActionRouter {
         // TODO:
         claim = abi.encodePacked(
             claim,
-            " This UMA query identifier is set to 'ASSERT_TRUTH', callback recepient and escalationManager set to zero address, domainId set to bytes32(0), asserter is ",
+            " The JSON object in the proposal body contains 'executor' field which exacly matches following value: '",
+            Strings.toHexString(executor),
+            "'. This UMA query identifier is set to 'ASSERT_TRUTH', callback recepient and escalation manager set to zero address (0x0000000000000000000000000000000000000000), domain id set to bytes32(0) (0x0000000000000000000000000000000000000000000000000000000000000000), asserter set to '",
             Strings.toHexString(address(this)),
-            ". This UMA query has a liveness of ",
+            "'. This UMA query has a liveness of ",
             Strings.toString(liveness),
-            " seconds, is submitted on a blockchain with chainId ",
+            " seconds, is submitted on a blockchain with chain id ",
             Strings.toString(block.chainid),
             ", has a bond token with address ",
             Strings.toHexString(bondToken),
             " (symbol ",
             IERC20Metadata(bondToken).symbol(),
-            ") and the bond token amount was ",
+            ") and the bond token amount is ",
             uintToDecimalString(
                 bondTokenAmount,
                 IERC20Metadata(bondToken).decimals()
             ),
-            " as declared in the JSON object in fields 'liveness', 'chainId', 'bondToken' and 'bondTokenAmount' respectively."
+            " as declared in the JSON object of the proposal body in fields 'liveness', 'chainId', 'bondToken' and 'bondTokenAmount' respectively."
         );
 
         return string(claim);
