@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 import "./gelato/AutomateTaskCreator.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-abstract contract ActionRouter is AutomateTaskCreator {
+abstract contract SnapshotAction is AutomateTaskCreator {
     struct Request {
         bytes32 gelatoTaskId;
         bytes32 assertionId;
