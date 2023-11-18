@@ -46,7 +46,7 @@ contract ActionRouter {
         oov3 = OptimisticOracleV3Interface(oov3Address);
     }
 
-    function postSnapshotResultsAndSheduleExec(
+    function postSnapshotResultsAndScheduleExec(
         string calldata snapshotProposalUrl,
         string[] calldata options,
         uint256[] calldata voteWeights,
@@ -59,6 +59,11 @@ contract ActionRouter {
         address executor
     ) external {
         bytes32 requestId = keccak256(abi.encodePacked(snapshotProposalUrl));
+        IERC20(bondToken).transferFrom(
+            msg.sender,
+            address(this),
+            bondTokenAmount
+        );
 
         requests[requestId] = Request({
             snapshotProposalUrl: snapshotProposalUrl,
@@ -80,6 +85,30 @@ contract ActionRouter {
             options,
             voteWeights,
             data
+        );
+
+        IERC20(bondToken).approve(address(oov3), bondTokenAmount);
+
+        oov3.assertTruth(
+            bytes(
+                formatClaim(
+                    snapshotProposalUrl,
+                    options,
+                    voteWeights,
+                    liveness,
+                    data,
+                    bondToken,
+                    bondTokenAmount
+                )
+            ),
+            address(this),
+            address(0),
+            address(0),
+            uint64(liveness),
+            IERC20(0x07865c6E87B9F70255377e024ace6630C1Eaa37F), //IERC20(bondToken),
+            0, //bondTokenAmount,
+            oov3.defaultIdentifier(),
+            bytes32(0)
         );
     }
 
@@ -143,7 +172,7 @@ contract ActionRouter {
             );
         }
 
-        // TODO: 
+        // TODO:
         claim = abi.encodePacked(
             claim,
             " This UMA query identifier is set to 'ASSERT_TRUTH', callback recepient and escalationManager set to zero address, domainId set to bytes32(0), asserter is ",

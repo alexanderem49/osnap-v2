@@ -12,6 +12,7 @@ contract Token is ERC20 {
         uint8 decimals_
     ) ERC20(name_, symbol_) {
         _decimals = decimals_;
+        _mint(msg.sender, 1_000_000 * 10**decimals_);
     }
 
     function decimals() public view virtual override returns (uint8) {

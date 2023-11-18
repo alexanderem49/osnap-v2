@@ -21,8 +21,9 @@ module.exports = {
   networks: {
     hardhat: {
       forking: {
-        enabled: false,
+        enabled: true,
         url: process.env.GOERLI_URL || fallbackRpc,
+        blockNumber: 10066046
       },
       accounts: {
         mnemonic: process.env.MNEMONIC || fallbackMnemonic
