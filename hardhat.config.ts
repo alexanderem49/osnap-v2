@@ -1,4 +1,7 @@
 import "@nomicfoundation/hardhat-toolbox";
+import * as dotenv from "dotenv";
+
+dotenv.config();
 
 const fallbackMnemonic = "test test test test test test test test test test test junk";
 const fallbackRpc = "http://localhost:8545";
