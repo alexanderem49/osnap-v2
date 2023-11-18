@@ -8,11 +8,20 @@ const fallbackRpc = "http://localhost:8545";
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: "0.8.22",
+  solidity: {
+    version: "0.8.22",
+    settings: {
+      viaIR: true,
+      optimizer: {
+        enabled: true,
+        runs: 1000000
+      }
+    }
+  },
   networks: {
     hardhat: {
       forking: {
-        enabled: true,
+        enabled: false,
         url: process.env.GOERLI_URL || fallbackRpc,
       },
       accounts: {
