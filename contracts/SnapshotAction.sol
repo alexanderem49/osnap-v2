@@ -143,20 +143,22 @@ abstract contract ActionRouter is AutomateTaskCreator {
 
         action();
 
+        uint256 fee = 0;
         if (isDedicatedMsgSenderOrAutomate()) {
-            (uint256 fee, address feeToken) = _getFeeDetails();
+            address feeToken;
+            (fee, feeToken) = _getFeeDetails();
             _transfer(fee, feeToken);
         }
 
         if (request.gasPaymentToken == NATIVE_ETH) {
             Address.sendValue(
                 payable(request.submitter),
-                address(this).balance
+                request.gasPaymentAmount - fee
             );
         } else {
             IERC20(request.gasPaymentToken).transfer(
                 request.submitter,
-                IERC20(request.gasPaymentToken).balanceOf(address(this))
+                request.gasPaymentAmount - fee
             );
         }
     }
