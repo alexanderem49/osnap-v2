@@ -11,7 +11,7 @@ contract Test is AutomateTaskCreator {
     uint256 public actionTimestamp;
     bytes32 public taskId;
     address public payer;
-    bool public isExecuted;
+    bool public isExecuted = true;
 
     // Network - goerli
     address public constant AUTOMATE =
@@ -41,17 +41,15 @@ contract Test is AutomateTaskCreator {
     function actionStep1() external payable {
         actionTimestamp = block.timestamp;
         payer = msg.sender;
+        isExecuted = false;
 
         ModuleData memory moduleData = ModuleData({
             modules: new Module[](1),
             args: new bytes[](1)
         });
 
-        moduleData.modules[0] = Module.RESOLVER;
-        moduleData.args[0] = _resolverModuleArg(
-            address(this),
-            abi.encodeCall(this.checker, ())
-        );
+        moduleData.modules[0] = Module.SINGLE_EXEC;
+        moduleData.args[0] = _singleExecModuleArg();
 
         taskId = _createTask(
             address(this),
@@ -62,11 +60,11 @@ contract Test is AutomateTaskCreator {
     }
 
     function actionStep2() external onlyDedicatedMsgSenderOrAutomate {
+        require(checker(), "Action not executable");
+
         isExecuted = true;
         emit Success();
         gasBomb();
-
-        _cancelTask(taskId);
 
         (uint256 fee, address feeToken) = _getFeeDetails();
         _transfer(fee, feeToken);
@@ -74,14 +72,8 @@ contract Test is AutomateTaskCreator {
         payable(payer).transfer(address(this).balance);
     }
 
-    function checker()
-        external
-        view
-        returns (bool canExec, bytes memory execPayload)
-    {
-        canExec = isExecuted
-            ? false
-            : block.timestamp >= actionTimestamp + 1 minutes;
-        execPayload = abi.encodeWithSelector(this.actionStep2.selector);
+    function checker() public view returns (bool) {
+        return
+            isExecuted ? false : block.timestamp >= actionTimestamp + 1 minutes;
     }
 }
