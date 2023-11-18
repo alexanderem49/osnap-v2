@@ -5,9 +5,13 @@ import "./interfaces/uma/OptimisticOracleV3Interface.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "./utils/Bytes.sol";
 import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
+import "./gelato/AutomateTaskCreator.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
-contract ActionRouter {
+abstract contract ActionRouter is AutomateTaskCreator {
     struct Request {
+        bytes32 gelatoTaskId;
+        bytes32 assertionId;
         string snapshotProposalUrl;
         string[] options;
         uint256[] voteWeights;
@@ -18,10 +22,13 @@ contract ActionRouter {
         address gasPaymentToken;
         uint256 gasPaymentAmount;
         address submitter;
-        address executor;
     }
 
+    address public constant NATIVE_ETH =
+        0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
     OptimisticOracleV3Interface public immutable oov3;
+    address public automateAddress;
 
     Request public request;
 
@@ -31,8 +38,12 @@ contract ActionRouter {
     );
 
     // Goerli: 0x9923D42eF695B5dd9911D05Ac944d4cAca3c4EAB
-    constructor(address oov3Address) {
+    constructor(
+        address oov3Address,
+        address _automateAddress
+    ) AutomateTaskCreator(_automateAddress, address(this)) {
         oov3 = OptimisticOracleV3Interface(oov3Address);
+        automateAddress = _automateAddress;
     }
 
     function postSnapshotResultsAndScheduleExec(
@@ -44,16 +55,35 @@ contract ActionRouter {
         uint256 liveness,
         address gasPaymentToken,
         uint256 gasPaymentAmount,
-        bytes calldata data,
-        address executor
-    ) external {
+        bytes calldata data
+    ) external payable {
         IERC20(bondToken).transferFrom(
             msg.sender,
             address(this),
             bondTokenAmount
         );
 
+        if (gasPaymentToken == NATIVE_ETH) {
+            require(
+                msg.value == gasPaymentAmount,
+                "Incorrect ETH payment amount"
+            );
+        } else {
+            IERC20(gasPaymentToken).transferFrom(
+                msg.sender,
+                address(this),
+                gasPaymentAmount
+            );
+        }
+
+        IERC20(gasPaymentToken).transferFrom(
+            msg.sender,
+            address(this),
+            gasPaymentAmount
+        );
+
         request = Request({
+            assertionId: bytes32(0),
             snapshotProposalUrl: snapshotProposalUrl,
             options: options,
             voteWeights: voteWeights,
@@ -64,11 +94,11 @@ contract ActionRouter {
             gasPaymentToken: gasPaymentToken,
             gasPaymentAmount: gasPaymentAmount,
             submitter: msg.sender,
-            executor: executor
+            gelatoTaskId: bytes32(0)
         });
 
         approveIfNeeded(bondToken, address(oov3), bondTokenAmount);
-        oov3.assertTruth(
+        request.assertionId = oov3.assertTruth(
             bytes(
                 formatClaim(
                     snapshotProposalUrl,
@@ -77,8 +107,7 @@ contract ActionRouter {
                     liveness,
                     data,
                     bondToken,
-                    bondTokenAmount,
-                    executor
+                    bondTokenAmount
                 )
             ),
             address(this),
@@ -90,6 +119,46 @@ contract ActionRouter {
             oov3.defaultIdentifier(),
             bytes32(0)
         );
+
+        ModuleData memory moduleData = ModuleData({
+            modules: new Module[](1),
+            args: new bytes[](1)
+        });
+
+        moduleData.modules[0] = Module.SINGLE_EXEC;
+        moduleData.args[0] = _singleExecModuleArg();
+
+        request.gelatoTaskId = _createTask(
+            address(this),
+            abi.encode(this.settleAndExecuteAction.selector),
+            moduleData,
+            gasPaymentToken
+        );
+    }
+
+    function action() internal virtual;
+
+    function settleAndExecuteAction() external {
+        oov3.settleAndGetAssertionResult(request.assertionId);
+
+        action();
+
+        if (isDedicatedMsgSenderOrAutomate()) {
+            (uint256 fee, address feeToken) = _getFeeDetails();
+            _transfer(fee, feeToken);
+        }
+
+        if (request.gasPaymentToken == NATIVE_ETH) {
+            Address.sendValue(
+                payable(request.submitter),
+                address(this).balance
+            );
+        } else {
+            IERC20(request.gasPaymentToken).transfer(
+                request.submitter,
+                IERC20(request.gasPaymentToken).balanceOf(address(this))
+            );
+        }
     }
 
     function formatClaim(
@@ -99,8 +168,7 @@ contract ActionRouter {
         uint256 liveness,
         bytes memory data,
         address bondToken,
-        uint256 bondTokenAmount,
-        address executor
+        uint256 bondTokenAmount
     ) public view returns (string memory) {
         uint256 optionsLength = options.length;
 
@@ -113,7 +181,7 @@ contract ActionRouter {
         bytes memory claim = abi.encodePacked(
             "Snapshot proposal is available at '",
             snapshotProposalUrl,
-            "', is in 'Closed' state and has the following results for all options in the proposal: "
+            "', is in 'Closed' state and has the following results in the proposal for all options in exact same order: "
         );
 
         for (uint256 i = 0; i < (optionsLength - 1); i++) {
@@ -156,7 +224,7 @@ contract ActionRouter {
         claim = abi.encodePacked(
             claim,
             " The JSON object in the proposal body contains 'executor' field which exacly matches following value: '",
-            Strings.toHexString(executor),
+            Strings.toHexString(address(this)),
             "'. This UMA query identifier is set to 'ASSERT_TRUTH', callback recepient and escalation manager set to zero address (0x0000000000000000000000000000000000000000), domain id set to bytes32(0) (0x0000000000000000000000000000000000000000000000000000000000000000), asserter set to '",
             Strings.toHexString(address(this)),
             "'. This UMA query has a liveness of ",
@@ -228,6 +296,11 @@ contract ActionRouter {
                     Strings.toString(remainder)
                 )
             );
+    }
+
+    function isDedicatedMsgSenderOrAutomate() private view returns (bool) {
+        return
+            msg.sender == automateAddress || msg.sender == dedicatedMsgSender;
     }
 
     function approveIfNeeded(
