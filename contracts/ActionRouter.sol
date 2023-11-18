@@ -174,7 +174,6 @@ contract ActionRouter {
             );
         }
 
-        // TODO:
         claim = abi.encodePacked(
             claim,
             " The JSON object in the proposal body contains 'executor' field which exacly matches following value: '",
