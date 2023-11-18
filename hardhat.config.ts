@@ -34,6 +34,12 @@ module.exports = {
         mnemonic: process.env.MNEMONIC || fallbackMnemonic
       }
     },
+    mainnet: {
+      url: process.env.MAINNET_URL || fallbackRpc,
+      accounts: {
+        mnemonic: process.env.MNEMONIC || fallbackMnemonic
+      }
+    },
   },
   etherscan: {
     apiKey: {
