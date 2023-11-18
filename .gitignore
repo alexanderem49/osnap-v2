@@ -21,3 +21,10 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Hardhat
+.env
+typechain
+typechain-types
+cache
+artifacts
