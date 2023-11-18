@@ -28,8 +28,7 @@ async function main() {
             300,
             "0x",
             await token.getAddress(),
-            tokenAmount,
-            "0x1234567890123456789012345678901234567890"
+            tokenAmount
         )
         ))
 }

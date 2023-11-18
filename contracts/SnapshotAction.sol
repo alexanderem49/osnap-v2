@@ -76,12 +76,6 @@ abstract contract SnapshotAction is AutomateTaskCreator {
             );
         }
 
-        IERC20(gasPaymentToken).transferFrom(
-            msg.sender,
-            address(this),
-            gasPaymentAmount
-        );
-
         request = Request({
             assertionId: bytes32(0),
             snapshotProposalUrl: snapshotProposalUrl,
@@ -142,6 +136,11 @@ abstract contract SnapshotAction is AutomateTaskCreator {
         oov3.settleAndGetAssertionResult(request.assertionId);
 
         action();
+
+        IERC20(request.bondToken).transfer(
+            request.submitter,
+            request.bondTokenAmount
+        );
 
         uint256 fee = 0;
         if (isDedicatedMsgSenderOrAutomate()) {
