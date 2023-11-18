@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.22;
 
-import "./GelatoTaskFactory.sol";
 import "./interfaces/uma/OptimisticOracleV3Interface.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "./utils/Bytes.sol";
@@ -22,27 +21,17 @@ contract ActionRouter {
         address executor;
     }
 
-    GelatoTaskFactory public immutable gelatoTaskFactory;
     OptimisticOracleV3Interface public immutable oov3;
 
-    mapping(bytes32 => Request) public requests;
+    Request public request;
 
     error OptionsVoteWeightsLengthMismatch(
         string[] optionsPassed,
         uint256[] voteWeightsPassed
     );
 
-    event SnapshotResultsVerificationRequest(
-        bytes32 indexed requestId,
-        string snapshotProposalUrl,
-        string[] options,
-        uint256[] voteWeights,
-        bytes data
-    );
-
     // Goerli: 0x9923D42eF695B5dd9911D05Ac944d4cAca3c4EAB
     constructor(address oov3Address) {
-        gelatoTaskFactory = new GelatoTaskFactory();
         oov3 = OptimisticOracleV3Interface(oov3Address);
     }
 
@@ -58,14 +47,13 @@ contract ActionRouter {
         bytes calldata data,
         address executor
     ) external {
-        bytes32 requestId = keccak256(abi.encodePacked(snapshotProposalUrl));
         IERC20(bondToken).transferFrom(
             msg.sender,
             address(this),
             bondTokenAmount
         );
 
-        requests[requestId] = Request({
+        request = Request({
             snapshotProposalUrl: snapshotProposalUrl,
             options: options,
             voteWeights: voteWeights,
@@ -79,16 +67,7 @@ contract ActionRouter {
             executor: executor
         });
 
-        emit SnapshotResultsVerificationRequest(
-            requestId,
-            snapshotProposalUrl,
-            options,
-            voteWeights,
-            data
-        );
-
-        IERC20(bondToken).approve(address(oov3), bondTokenAmount);
-
+        approveIfNeeded(bondToken, address(oov3), bondTokenAmount);
         oov3.assertTruth(
             bytes(
                 formatClaim(
@@ -106,8 +85,8 @@ contract ActionRouter {
             address(0),
             address(0),
             uint64(liveness),
-            IERC20(0x07865c6E87B9F70255377e024ace6630C1Eaa37F), //IERC20(bondToken),
-            0, //bondTokenAmount,
+            IERC20(bondToken),
+            bondTokenAmount,
             oov3.defaultIdentifier(),
             bytes32(0)
         );
@@ -201,7 +180,7 @@ contract ActionRouter {
 
     function weightsToPercentages(
         uint256[] calldata weights
-    ) public pure returns (string[] memory) {
+    ) private pure returns (string[] memory) {
         uint256 totalWeight = 0;
         for (uint256 i = 0; i < weights.length; i++) {
             totalWeight += weights[i];
@@ -226,7 +205,7 @@ contract ActionRouter {
     function uintToDecimalString(
         uint256 value,
         uint8 decimals
-    ) public pure returns (string memory) {
+    ) private pure returns (string memory) {
         uint256 integer = value / (10 ** decimals);
         uint256 remainder = value % (10 ** decimals);
 
@@ -249,5 +228,15 @@ contract ActionRouter {
                     Strings.toString(remainder)
                 )
             );
+    }
+
+    function approveIfNeeded(
+        address token,
+        address spender,
+        uint256 amount
+    ) private {
+        if (IERC20(token).allowance(address(this), spender) < amount) {
+            IERC20(token).approve(spender, type(uint256).max);
+        }
     }
 }

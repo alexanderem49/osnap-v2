@@ -6,9 +6,9 @@ async function main() {
     const contract = await factory.deploy("0x9923D42eF695B5dd9911D05Ac944d4cAca3c4EAB") as ActionRouter;
     const signer = (await ethers.getSigners())[0];
 
-    const token = await ethers.getContractAt("Token", "0x2f0FBFB9a0A98D92b62dC35859d1d8C6AdDd57eB") as Token;
+    const token = await ethers.getContractAt("Token", "0x07865c6E87B9F70255377e024ace6630C1Eaa37F") as Token;
 
-    const tokenAmount = ethers.parseUnits("1000", await token.decimals());
+    const tokenAmount = ethers.parseUnits("10", await token.decimals());
 
     if (await token.allowance(await signer.getAddress(), await contract.getAddress()) < tokenAmount) {
         console.log("approving")

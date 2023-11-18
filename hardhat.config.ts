@@ -23,7 +23,7 @@ module.exports = {
       forking: {
         enabled: true,
         url: process.env.GOERLI_URL || fallbackRpc,
-        blockNumber: 10066046
+        blockNumber: 10066325
       },
       accounts: {
         mnemonic: process.env.MNEMONIC || fallbackMnemonic
