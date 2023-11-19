@@ -47,7 +47,7 @@ async function main() {
         from: await account.getAddress(),
         space,
         timestamp: Math.floor(Date.now() / 1e3),
-        title: `How many USDC tokens on Goerli should we send to ${receiverAddress}?}`,
+        title: `How many USDC tokens on Goerli should we send to ${receiverAddress}?`,
         body,
         type: 'quadratic' as ProposalType,
         discussion: "https://google.com",
